@@ -11,11 +11,13 @@ const updateTaskSchema = z.object({
   completed: z.boolean().optional(),
 });
 
-interface RouteParams {
-  params: { taskId: string };
+// Define the shape of the context object passed to the route handler
+// IMPORTANT: params is now a Promise resolving to the object
+interface RouteHandlerContext {
+  params: Promise<{ taskId: string }>; // <-- Correct type: Promise
 }
 
-// Helper function to check ownership
+// Helper function to check ownership (keep as is)
 async function checkTaskOwnership(taskId: number, userId: number): Promise<boolean> {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
@@ -26,9 +28,13 @@ async function checkTaskOwnership(taskId: number, userId: number): Promise<boole
 
 
 // PUT /api/tasks/[taskId] - Update a specific task
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: Request, context: RouteHandlerContext) { // <-- Keep context
   const session = await getServerSession(authOptions);
-  const taskId = parseInt(params.taskId, 10);
+
+  // Await the params promise first!
+  const resolvedParams = await context.params; // <-- Await the promise
+  const taskIdString = resolvedParams.taskId; // <-- Access taskId from the resolved object
+  const taskId = parseInt(taskIdString, 10);
 
   if (isNaN(taskId)) {
     return NextResponse.json({ message: 'Invalid task ID' }, { status: 400 });
@@ -37,14 +43,12 @@ export async function PUT(request: Request, { params }: RouteParams) {
   if (!session?.user?.id) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-  const userId = parseInt(session.user.id, 10);
+  const userId = parseInt(session.user.id, 10); // Consider if user.id is already a number
 
   try {
     // Verify ownership before update
     const isOwner = await checkTaskOwnership(taskId, userId);
     if (!isOwner) {
-      // Return 404 if task doesn't exist or 403 if it exists but isn't owned
-      // Returning 404 might be slightly better to not reveal task existence
       return NextResponse.json({ message: 'Task not found or access denied' }, { status: 404 });
     }
 
@@ -55,7 +59,6 @@ export async function PUT(request: Request, { params }: RouteParams) {
       return NextResponse.json({ errors: validation.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    // Ensure at least one field is being updated
     if (Object.keys(validation.data).length === 0) {
       return NextResponse.json({ message: 'No update data provided' }, { status: 400 });
     }
@@ -63,16 +66,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const updatedTask = await prisma.task.update({
       where: {
         id: taskId,
-        // You could add userId here too for an extra layer, though checkTaskOwnership handles it
-        // userId: userId
       },
-      data: validation.data, // Only pass validated fields
+      data: validation.data,
     });
     return NextResponse.json(updatedTask);
 
   } catch (error) {
     console.error(`Error updating task ${taskId}:`, error);
-    // Handle specific errors like Prisma's P2025 (Record to update not found)
     if ((error as any)?.code === 'P2025') {
       return NextResponse.json({ message: 'Task not found' }, { status: 404 });
     }
@@ -81,9 +81,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
 }
 
 // DELETE /api/tasks/[taskId] - Delete a specific task
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(request: Request, context: RouteHandlerContext) { // <-- Keep context
   const session = await getServerSession(authOptions);
-  const taskId = parseInt(params.taskId, 10);
+
+  // Await the params promise first!
+  const resolvedParams = await context.params; // <-- Await the promise
+  const taskIdString = resolvedParams.taskId; // <-- Access taskId from the resolved object
+  const taskId = parseInt(taskIdString, 10);
 
   if (isNaN(taskId)) {
     return NextResponse.json({ message: 'Invalid task ID' }, { status: 400 });
@@ -92,28 +96,24 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   if (!session?.user?.id) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-  const userId = parseInt(session.user.id, 10);
+  const userId = parseInt(session.user.id, 10); // Consider if user.id is already a number
 
   try {
     // Verify ownership before delete
     const isOwner = await checkTaskOwnership(taskId, userId);
     if (!isOwner) {
-      // Return 404 if task doesn't exist or 403 if it exists but isn't owned
       return NextResponse.json({ message: 'Task not found or access denied' }, { status: 404 });
     }
 
     await prisma.task.delete({
       where: {
         id: taskId,
-        // userId: userId // Optional extra check
       },
     });
-    // Return 204 No Content for successful deletions is common practice
     return new NextResponse(null, { status: 204 });
 
   } catch (error) {
     console.error(`Error deleting task ${taskId}:`, error);
-    // Handle specific errors like Prisma's P2025 (Record to delete not found)
     if ((error as any)?.code === 'P2025') {
       return NextResponse.json({ message: 'Task not found' }, { status: 404 });
     }
