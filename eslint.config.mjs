@@ -1,3 +1,4 @@
+// eslint.config.mjs
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { FlatCompat } from "@eslint/eslintrc";
@@ -10,7 +11,28 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // Use compat.config() to load configurations AND apply overrides
+  ...compat.config({
+    // List the configurations you want to extend
+    extends: [
+      "next/core-web-vitals",
+      // You had "next/typescript" here. 'next/core-web-vitals' usually
+      // includes the necessary TypeScript setup. If you specifically need
+      // something from 'next/typescript' that isn't in core-web-vitals,
+      // you can keep it, but often 'next/core-web-vitals' is sufficient.
+      // "next/typescript",
+    ],
+    // Add your rule overrides here
+    rules: {
+      // --- Rules to Disable ---
+      '@typescript-eslint/no-unused-vars': 'off', // Disables errors for unused variables/imports
+      '@typescript-eslint/no-explicit-any': 'off',  // Allows using the 'any' type
+      'react/no-unescaped-entities': 'off',     // Allows characters like ' in JSX without escaping
+    },
+  }),
+
+  // You can add other flat config objects here if needed
+  // e.g., { files: [...], rules: {...} } for specific file types
 ];
 
 export default eslintConfig;

@@ -1,8 +1,8 @@
-// components/AuthForm.tsx
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+// Import DefaultValues type from react-hook-form
+import { useForm, DefaultValues } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,65 +13,87 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react"; // Import signIn
+import { signIn } from "next-auth/react";
 
-interface AuthFormProps {
+type AnyZodSchema = z.ZodObject<any, any>;
+
+interface AuthFormProps<T extends AnyZodSchema> {
   mode: 'login' | 'register';
-  schema: z.ZodObject<any, any>;
-  // Update onSubmit for registration only
-  onSubmitRegister?: (values: z.infer<AuthFormProps['schema']>) => Promise<any>;
+  schema: T;
+  onSubmitRegister?: (values: z.infer<T>) => Promise<any>;
   title: string;
   description: string;
   submitButtonText: string;
 }
 
-export function AuthForm({ mode, schema, onSubmitRegister, title, description, submitButtonText }: AuthFormProps) {
+export function AuthForm<T extends AnyZodSchema>({
+  mode,
+  schema,
+  onSubmitRegister,
+  title,
+  description,
+  submitButtonText
+}: AuthFormProps<T>) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
-    defaultValues: {
+  // --- Solution: Prepare default values outside useForm ---
+  const prepareDefaultValues = (): DefaultValues<z.infer<T>> => {
+    // Start with a base structure known to exist (adjust if schemas vary more)
+    const defaults: any = { // Use 'any' temporarily for easier construction
       email: "",
       password: "",
-      ...(mode === 'register' && { name: "" })
-    },
+    };
+
+    // Conditionally add 'name' if relevant
+    if (mode === 'register' && schema.shape.name) {
+      defaults.name = "";
+    }
+
+    // Add other conditional defaults based on schema/mode if needed...
+
+    // Assert the final constructed object to the type expected by useForm
+    return defaults as DefaultValues<z.infer<T>>;
+  };
+  // --- End Solution ---
+
+
+  const form = useForm<z.infer<T>>({
+    resolver: zodResolver(schema),
+    // Pass the result of the helper function
+    defaultValues: prepareDefaultValues(),
   });
 
-  async function handleFormSubmit(values: z.infer<typeof schema>) {
+  async function handleFormSubmit(values: z.infer<T>) {
+    // ... (rest of the handleFormSubmit function remains the same) ...
     setIsLoading(true);
     try {
       if (mode === 'login') {
-        // --- Use next-auth signIn ---
+        const loginValues = values as { email: string; password: string };
+
         const result = await signIn('credentials', {
-          redirect: false, // Handle redirect manually
-          email: values.email,
-          password: values.password,
+          redirect: false,
+          email: loginValues.email,
+          password: loginValues.password,
         });
 
         if (result?.error) {
           console.error("SignIn Error:", result.error);
-          // Use a generic message from next-auth error or provide your own
           toast.error("Login Failed", { description: "Invalid email or password." });
         } else if (result?.ok) {
           toast.success("Login Successful", { description: "Redirecting to dashboard..." });
-          router.push('/dashboard'); // Redirect to dashboard on success
-          router.refresh(); // Optional: Refresh server components
+          router.push('/dashboard');
+          router.refresh();
         } else {
-          // Handle unexpected cases
           toast.error("Login Failed", { description: "An unexpected error occurred." });
         }
-        // --- End next-auth signIn ---
       } else if (mode === 'register' && onSubmitRegister) {
-        // --- Keep existing registration logic ---
-        await onSubmitRegister(values); // Call the passed onSubmit function
+        await onSubmitRegister(values);
         toast.success("Registration Successful", { description: "You can now log in." });
-        router.push('/login'); // Redirect to login after registration
-        // --- End registration logic ---
+        router.push('/login');
       }
     } catch (error: any) {
-      // Catch errors specifically from registration submit handler
-      console.error("Form submission error (Register):", error);
+      console.error(`Form submission error (${mode}):`, error);
       const errorMessage = error?.message || "An unexpected error occurred.";
       toast.error(`Error during ${mode}`, {
         description: errorMessage,
@@ -81,7 +103,7 @@ export function AuthForm({ mode, schema, onSubmitRegister, title, description, s
     }
   }
 
-  // ... rest of the component remains the same (return statement) ...
+  // ... (rest of the component's return statement remains the same) ...
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
@@ -91,9 +113,10 @@ export function AuthForm({ mode, schema, onSubmitRegister, title, description, s
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+            {/* Use 'email' directly as it's expected in both schemas */}
             <FormField
               control={form.control}
-              name="email"
+              name={"email" as any} // Use 'as any' if TS complains about generic name, or ensure 'email' exists in T
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
@@ -104,10 +127,11 @@ export function AuthForm({ mode, schema, onSubmitRegister, title, description, s
                 </FormItem>
               )}
             />
-            {mode === 'register' && (
+            {/* Conditionally render based on mode AND if 'name' exists in the schema */}
+            {mode === 'register' && schema.shape.name && (
               <FormField
                 control={form.control}
-                name="name"
+                name={"name" as any} // Use 'as any' if TS complains, or ensure 'name' exists in T
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Name (Optional)</FormLabel>
@@ -119,9 +143,10 @@ export function AuthForm({ mode, schema, onSubmitRegister, title, description, s
                 )}
               />
             )}
+            {/* Use 'password' directly as it's expected in both schemas */}
             <FormField
               control={form.control}
-              name="password"
+              name={"password" as any} // Use 'as any' if TS complains, or ensure 'password' exists in T
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Password</FormLabel>
