@@ -1,3 +1,4 @@
+// components/AuthForm.tsx
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -5,41 +6,34 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-// import { useToast } from "@/components/ui/use-toast";
-import { toast } from "sonner"; // ADD this line
+import { toast } from "sonner";
 import { useState } from "react";
-import { useRouter } from "next/navigation"; // Use next/navigation for App Router
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react"; // Import signIn
 
 interface AuthFormProps {
   mode: 'login' | 'register';
-  schema: z.ZodObject<any, any>; // Accept any Zod object schema
-  onSubmit: (values: z.infer<AuthFormProps['schema']>) => Promise<any>; // Async submit handler
+  schema: z.ZodObject<any, any>;
+  // Update onSubmit for registration only
+  onSubmitRegister?: (values: z.infer<AuthFormProps['schema']>) => Promise<any>;
   title: string;
   description: string;
   submitButtonText: string;
 }
 
-export function AuthForm({ mode, schema, onSubmit, title, description, submitButtonText }: AuthFormProps) {
-  // const { toast } = useToast();
+export function AuthForm({ mode, schema, onSubmitRegister, title, description, submitButtonText }: AuthFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
-    // REMOVE schema.parse() here - just provide the object directly
     defaultValues: {
       email: "",
       password: "",
-      // This conditional spread for 'name' is correct
       ...(mode === 'register' && { name: "" })
     },
   });
@@ -47,23 +41,39 @@ export function AuthForm({ mode, schema, onSubmit, title, description, submitBut
   async function handleFormSubmit(values: z.infer<typeof schema>) {
     setIsLoading(true);
     try {
-      const result = await onSubmit(values); // Call the passed onSubmit function
-
       if (mode === 'login') {
-        // Use sonner's success toast
-        toast.success("Login Successful", { description: "Redirecting..." }); // UPDATED
-        const userName = result?.userName || 'User';
-        router.push(`/dashboard?name=${encodeURIComponent(userName)}`);
-      } else {
-        // Use sonner's success toast
-        toast.success("Registration Successful", { description: "You can now log in." }); // UPDATED
-        router.push('/login');
-      }
+        // --- Use next-auth signIn ---
+        const result = await signIn('credentials', {
+          redirect: false, // Handle redirect manually
+          email: values.email,
+          password: values.password,
+        });
 
+        if (result?.error) {
+          console.error("SignIn Error:", result.error);
+          // Use a generic message from next-auth error or provide your own
+          toast.error("Login Failed", { description: "Invalid email or password." });
+        } else if (result?.ok) {
+          toast.success("Login Successful", { description: "Redirecting to dashboard..." });
+          router.push('/dashboard'); // Redirect to dashboard on success
+          router.refresh(); // Optional: Refresh server components
+        } else {
+          // Handle unexpected cases
+          toast.error("Login Failed", { description: "An unexpected error occurred." });
+        }
+        // --- End next-auth signIn ---
+      } else if (mode === 'register' && onSubmitRegister) {
+        // --- Keep existing registration logic ---
+        await onSubmitRegister(values); // Call the passed onSubmit function
+        toast.success("Registration Successful", { description: "You can now log in." });
+        router.push('/login'); // Redirect to login after registration
+        // --- End registration logic ---
+      }
     } catch (error: any) {
-      console.error("Form submission error:", error);
+      // Catch errors specifically from registration submit handler
+      console.error("Form submission error (Register):", error);
       const errorMessage = error?.message || "An unexpected error occurred.";
-      toast.error(`Error during ${mode}`, { // UPDATED
+      toast.error(`Error during ${mode}`, {
         description: errorMessage,
       });
     } finally {
@@ -71,6 +81,7 @@ export function AuthForm({ mode, schema, onSubmit, title, description, submitBut
     }
   }
 
+  // ... rest of the component remains the same (return statement) ...
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
@@ -93,7 +104,7 @@ export function AuthForm({ mode, schema, onSubmit, title, description, submitBut
                 </FormItem>
               )}
             />
-            {mode === 'register' && ( // Only show name field for registration
+            {mode === 'register' && (
               <FormField
                 control={form.control}
                 name="name"

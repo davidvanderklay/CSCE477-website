@@ -1,41 +1,35 @@
-"use client"; // Needs to be a client component for form handling
+// app/register/page.tsx
+"use client";
 
 import { AuthForm } from "@/components/AuthForm";
 import { z } from "zod";
 import Link from "next/link";
 
-// Define schema specifically for registration
 const registerSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
-  // **Client-side Validation Note:** We validate name length here.
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }).optional().or(z.literal('')), // Allow empty string or min 2 chars
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }).optional().or(z.literal('')),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
 
-
 export default function RegisterPage() {
 
+  // Keep the registration API call logic
   const handleRegister = async (values: z.infer<typeof registerSchema>) => {
-    // Ensure empty string name becomes undefined for the API if desired, or handle in API
     const payload = {
       ...values,
       name: values.name || undefined,
     };
-
-    const response = await fetch('/api/auth/register', {
+    const response = await fetch('/api/auth/register', { // Keep using your register API
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-
     const data = await response.json();
-
     if (!response.ok) {
-      // Handle specific API errors if available
       const errorMessage = data.message || (data.errors ? JSON.stringify(data.errors) : 'Registration failed');
-      throw new Error(errorMessage);
+      throw new Error(errorMessage); // Throw error to be caught by AuthForm
     }
-    return data; // Return data on success
+    return data;
   };
 
   return (
@@ -43,7 +37,7 @@ export default function RegisterPage() {
       <AuthForm
         mode="register"
         schema={registerSchema}
-        onSubmit={handleRegister}
+        onSubmitRegister={handleRegister} // Pass the handler here
         title="Register"
         description="Create a new account."
         submitButtonText="Register"

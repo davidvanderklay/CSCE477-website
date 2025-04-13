@@ -1,51 +1,41 @@
-"use client"; // Need client component to read search params
+// app/dashboard/page.tsx
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/authOptions";
+import { redirect } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import LogoutButton from "@/components/LogoutButton"; // We'll create this next
+import MemoryGame from "@/components/MemoryGame"; // We'll create this soon
 
-import { useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Suspense } from 'react'; // Import Suspense
+export default async function DashboardPage() {
+  // Fetch session data on the server
+  const session = await getServerSession(authOptions);
 
-// Component to actually read params and render content
-function DashboardContent() {
-  const searchParams = useSearchParams();
-  // **VULNERABILITY POINT FOR PART 3:**
-  // Get the name directly from the query parameter.
-  // In a secure app, you'd verify a session/token and fetch user data server-side.
-  const name = searchParams.get('name') || 'User';
+  // If no session, redirect to login page
+  if (!session || !session.user) {
+    redirect('/login'); // Or redirect('/api/auth/signin')
+  }
+
+  // Get user name securely from the session object
+  const userName = session.user.name || session.user.email || 'User'; // Fallback if name is null
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Welcome to your Dashboard!</CardTitle>
+    <div className="flex min-h-screen flex-col items-center p-4 pt-10 md:p-10">
+      <Card className="w-full max-w-4xl mb-6">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Welcome to your Dashboard!</CardTitle>
+            {/* Display name securely from session */}
+            <CardDescription>Hello there, <span className="font-semibold">{userName}</span>!</CardDescription>
+          </div>
+          <LogoutButton /> {/* Add logout button */}
         </CardHeader>
         <CardContent>
-          {/*
-                    **VULNERABILITY POINT FOR PART 3:**
-                    Displaying the name directly from the query parameter WITHOUT sanitization.
-                    If the name contains HTML/JS (like <script>alert('XSS')</script>),
-                    React *might* escape it by default when rendering directly as text.
-                    However, let's simulate a case where it might not be escaped,
-                    or where a developer might mistakenly use dangerouslySetInnerHTML.
-                    For clarity, we'll just render it directly, assuming React's default
-                    escaping might be bypassed or insufficient in a more complex scenario,
-                    or to explicitly show the *intent* of the vulnerability.
-                    The *exploit* in Part 3 will rely on this direct rendering.
-                    */}
-          <p>Hello there, <span className="font-semibold">{name}</span>!</p>
-          <p className="mt-4 text-sm text-gray-600">This is a very basic dashboard page.</p>
-          {/* Example of how it *could* be vulnerable if misused: */}
-          {/* <p>Your name (dangerously): <span dangerouslySetInnerHTML={{ __html: name }}></span></p> */}
+          <p className="text-sm text-gray-600 mb-6">Here's your memory game:</p>
+          {/* Add the Memory Game Component */}
+          <MemoryGame />
         </CardContent>
       </Card>
+      {/* You can add more dashboard content here */}
     </div>
-  );
-}
-
-// Main page component using Suspense
-export default function DashboardPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <DashboardContent />
-    </Suspense>
   );
 }
