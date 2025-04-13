@@ -17,4 +17,19 @@ model User {
   password  String // Hashed password
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tasks Task[] // Relation to Task model (one user has many tasks)
+}
+
+// NEW Task Model
+model Task {
+  id        Int      @id @default(autoincrement())
+  title     String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    Int // Foreign key to User
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Define relation
+
+  @@index([userId]) // Add index for performance
 }
