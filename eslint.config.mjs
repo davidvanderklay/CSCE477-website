@@ -23,12 +23,6 @@ const eslintConfig = [
       // "next/typescript",
     ],
     // Add your rule overrides here
-    rules: {
-      // --- Rules to Disable ---
-      '@typescript-eslint/no-unused-vars': 'off', // Disables errors for unused variables/imports
-      '@typescript-eslint/no-explicit-any': 'off',  // Allows using the 'any' type
-      'react/no-unescaped-entities': 'off',     // Allows characters like ' in JSX without escaping
-    },
   }),
 
   // You can add other flat config objects here if needed

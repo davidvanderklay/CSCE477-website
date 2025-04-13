@@ -24,7 +24,7 @@ export default function LoginPage() {
         submitButtonText="Log In"
       />
       <p className="mt-4 text-center text-sm text-gray-600">
-        Don't have an account?{' '}
+        Don&apos;t have an account?{' '}
         <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
           Register here
         </Link>
